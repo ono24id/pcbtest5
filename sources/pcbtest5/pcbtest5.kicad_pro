@@ -1,10 +1,10 @@
 {
   "meta": {
-    "filename": "PROJECT_NAME.kicad_pro",
+    "filename": "pcbtest5.kicad_pro",
     "version": 3
   },
   "text_variables": {
-    "PROJECT": "PROJECT_NAME",
+    "PROJECT": "pcbtest5",
     "REVISION": "dev"
   }
 }

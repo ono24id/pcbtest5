@@ -1,44 +1,17 @@
-# PROJECT_NAME
+# pcbtest5
 
 **English** | [Bahasa Indonesia](README.id.md)
 
 KiCad 10 hardware project.
 
-<!-- template:start -->
-## Using this template
-
-1. Click **Use this template → Create a new repository** on GitHub. The repository name
-   becomes the KiCad project name (e.g. `sensor-board`).
-2. The **Template init** workflow runs automatically on the first push:
-   - `PROJECT_NAME` is replaced with the repository name in both file names and file contents
-     (`sources/sensor-board/sensor-board.kicad_pro`, `libraries/sensor-board.kicad_sym`, etc.)
-   - the root schematic UUID is regenerated
-   - this section is removed from both READMEs and the result is committed by `github-actions[bot]`
-   - the **KiCad CI** workflow is triggered for the renamed project
-3. `git pull`, then open the `.kicad_pro` file in KiCad.
-
-Cloned locally without GitHub? Run it yourself:
-
-```bash
-scripts/init.sh my-project   # no argument: uses the repository folder name
-```
-
-> If the workflow's push is rejected, go to **Settings → Actions → General → Workflow permissions**,
-> select **Read and write permissions**, then re-run the *Template init* workflow
-> (Actions tab → Template init → Run workflow).
-
-After initialisation, `scripts/init.sh` and `.github/workflows/template-init.yml` no longer
-do anything and can be deleted.
-<!-- template:end -->
-
 ## Layout
 
 ```
-sources/PROJECT_NAME/        KiCad project (.kicad_pro/.kicad_sch/.kicad_pcb) + lib tables
+sources/pcbtest5/        KiCad project (.kicad_pro/.kicad_sch/.kicad_pcb) + lib tables
 libraries/
-  PROJECT_NAME.kicad_sym     project-specific symbols
-  PROJECT_NAME.pretty/       project-specific footprints
-  PROJECT_NAME.3dshapes/     3D models (STEP/WRL)
+  pcbtest5.kicad_sym     project-specific symbols
+  pcbtest5.pretty/       project-specific footprints
+  pcbtest5.3dshapes/     3D models (STEP/WRL)
   external/<name>/           external libraries (git submodules)
 scripts/                     init.sh, add/remove-library.sh, mcp-kicad.sh
 .mcp.json, .vscode/, .cursor/ MCP config for AI assistants
@@ -48,7 +21,7 @@ AGENTS.md, CLAUDE.md         instructions for AI agents
 
 The project libraries are registered in the project's `sym-lib-table` / `fp-lib-table` using
 `${KIPRJMOD}/../../libraries/...`, so they keep working wherever the repository is cloned.
-For 3D models, set the footprint model path to `${KIPRJMOD}/../../libraries/PROJECT_NAME.3dshapes/<file>.step`.
+For 3D models, set the footprint model path to `${KIPRJMOD}/../../libraries/pcbtest5.3dshapes/<file>.step`.
 
 The title block uses the text variables `${PROJECT}`, `${REVISION}` and `${CURRENT_DATE}`.
 `REVISION` is `dev` inside KiCad and is filled in by CI from the git tag / commit.
@@ -120,8 +93,8 @@ Every push / pull request runs [`kicad.yml`](.github/workflows/kicad.yml) in the
 | Step | Output |
 | --- | --- |
 | ERC, DRC (+ schematic parity) | `reports/erc.rpt`, `reports/drc.rpt` — the job fails on errors |
-| Schematic | `PROJECT_NAME-schematic.pdf`, `PROJECT_NAME-bom.csv` |
-| PCB | `gerbers/` + `PROJECT_NAME-gerbers.zip`, drill + drill map, `PROJECT_NAME-pos.csv`, `PROJECT_NAME-pcb.pdf`, `PROJECT_NAME.step` |
+| Schematic | `pcbtest5-schematic.pdf`, `pcbtest5-bom.csv` |
+| PCB | `gerbers/` + `pcbtest5-gerbers.zip`, drill + drill map, `pcbtest5-pos.csv`, `pcbtest5-pcb.pdf`, `pcbtest5.step` |
 
 Outputs can be downloaded from the **Actions** tab (artifacts). Gerber layers follow the
 **File → Plot** settings saved in the board.
