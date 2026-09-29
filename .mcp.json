@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "kicad": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["scripts/mcp-kicad.sh"]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "meta": {
+    "filename": "PROJECT_NAME.kicad_pro",
+    "version": 3
+  },
+  "text_variables": {
+    "PROJECT": "PROJECT_NAME",
+    "REVISION": "dev"
+  }
+}

@@ -1,0 +1,25 @@
+# KiCad temporary / per-user files
+*-backups/
+_autosave-*
+\#auto_saved_files\#
+*.lck
+~*.lck
+fp-info-cache
+*.kicad_prl
+*.bak
+*.bck
+*-bak
+*.sch-bak
+*.kicad_pcb-bak
+*.kicad_sch-bak
+
+# Generated outputs (CI produces these)
+output/
+production/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/mcp.json
+.idea/

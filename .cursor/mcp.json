@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "kicad": {
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/mcp-kicad.sh"]
+    }
+  }
+}

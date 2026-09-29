@@ -1,0 +1,152 @@
+# ERC/DRC checks and fabrication outputs with kicad-cli.
+# The project is discovered automatically (sources/*/*.kicad_pro), nothing is hard-coded.
+# Push a tag like v1.0 to attach a production zip to a GitHub Release.
+name: KiCad CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+    paths-ignore: ["**.md", "docs/**", ".mcp.json", ".vscode/**", ".cursor/**", "scripts/mcp-kicad.sh"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # In a repository just generated from the template, the first push still contains
+  # PROJECT_NAME; Template init renames it and then starts this workflow itself.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run=true
+          if gh api "repos/$GITHUB_REPOSITORY/contents/sources/PROJECT_NAME?ref=$GITHUB_SHA" --silent 2>/dev/null; then
+            tpl="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.template_repository.full_name // empty')"
+            if [ -n "$tpl" ]; then
+              echo "Not initialised yet; Template init will run KiCad CI after renaming."
+              run=false
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+  kicad:
+    needs: check
+    if: needs.check.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    # Use kicad/kicad:10.0-full if you need KiCad's 3D models in the STEP export (much larger image).
+    container:
+      image: kicad/kicad:10.0
+      options: --user root
+    env:
+      HOME: /root
+    outputs:
+      name: ${{ steps.locate.outputs.name }}
+      rev: ${{ steps.locate.outputs.rev }}
+    steps:
+      - name: Install git and zip
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends git zip ca-certificates >/dev/null
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          # Private library submodules: add a SUBMODULE_TOKEN secret (PAT with read access).
+          token: ${{ secrets.SUBMODULE_TOKEN || github.token }}
+
+      - name: Locate project
+        id: locate
+        run: |
+          PRO="$(find sources -mindepth 2 -maxdepth 2 -name '*.kicad_pro' | head -n1)"
+          [ -n "$PRO" ] || { echo "No .kicad_pro found under sources/"; exit 1; }
+          NAME="$(basename "$PRO" .kicad_pro)"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then REV="${GITHUB_REF_NAME}"; else REV="$(git describe --tags --always --dirty)"; fi
+          {
+            echo "NAME=$NAME"
+            echo "SCH=$(dirname "$PRO")/$NAME.kicad_sch"
+            echo "PCB=$(dirname "$PRO")/$NAME.kicad_pcb"
+            echo "REV=$REV"
+            echo "OUT=output/$NAME-$REV"
+          } >> "$GITHUB_ENV"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "rev=$REV" >> "$GITHUB_OUTPUT"
+
+      - name: ERC
+        id: erc
+        continue-on-error: true
+        run: |
+          mkdir -p "$OUT/reports"
+          kicad-cli sch erc --severity-error --exit-code-violations \
+            -o "$OUT/reports/erc.rpt" "$SCH"
+
+      - name: DRC
+        id: drc
+        continue-on-error: true
+        run: |
+          kicad-cli pcb drc --severity-error --schematic-parity --exit-code-violations \
+            -o "$OUT/reports/drc.rpt" "$PCB"
+
+      - name: Schematic PDF and BOM
+        run: |
+          kicad-cli sch export pdf -D REVISION="$REV" -o "$OUT/$NAME-schematic.pdf" "$SCH"
+          kicad-cli sch export bom -o "$OUT/$NAME-bom.csv" \
+            --fields 'Reference,Value,Footprint,${QUANTITY}' \
+            --labels 'Refs,Value,Footprint,Qty' \
+            --group-by Value,Footprint --exclude-dnp "$SCH"
+
+      - name: Gerbers, drill, placement
+        run: |
+          # Layer selection follows File > Plot settings saved in the board.
+          kicad-cli pcb export gerbers --board-plot-params -D REVISION="$REV" -o "$OUT/gerbers/" "$PCB"
+          kicad-cli pcb export drill --generate-map --map-format pdf -o "$OUT/gerbers/" "$PCB"
+          kicad-cli pcb export pos --side both --format csv --units mm --exclude-dnp \
+            -o "$OUT/$NAME-pos.csv" "$PCB"
+          (cd "$OUT/gerbers" && zip -q -r "../$NAME-gerbers.zip" .)
+
+      - name: PCB PDF and STEP
+        run: |
+          kicad-cli pcb export pdf --mode-multipage --ibt -D REVISION="$REV" \
+            -l F.Cu,B.Cu,F.Silkscreen,B.Silkscreen,F.Fab,B.Fab --cl Edge.Cuts \
+            -o "$OUT/$NAME-pcb.pdf" "$PCB"
+          kicad-cli pcb export step -f --subst-models -o "$OUT/$NAME.step" "$PCB"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ${{ env.NAME }}-${{ env.REV }}
+          path: ${{ env.OUT }}
+
+      - name: Fail on ERC/DRC violations
+        if: steps.erc.outcome == 'failure' || steps.drc.outcome == 'failure'
+        run: |
+          cat "$OUT/reports/erc.rpt" "$OUT/reports/drc.rpt" 2>/dev/null || true
+          echo "::error::ERC or DRC reported violations (see reports above / in the artifact)"
+          exit 1
+
+  release:
+    needs: kicad
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.kicad.outputs.name }}-${{ needs.kicad.outputs.rev }}
+          path: ${{ needs.kicad.outputs.name }}-${{ needs.kicad.outputs.rev }}
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ needs.kicad.outputs.name }}
+          REV: ${{ needs.kicad.outputs.rev }}
+        run: |
+          D="$NAME-$REV"
+          zip -q -r "$D.zip" "$D"
+          gh release create "$REV" --repo "$GITHUB_REPOSITORY" --title "$NAME $REV" --generate-notes \
+            "$D.zip" "$D/$NAME-gerbers.zip" "$D/$NAME-schematic.pdf" "$D/$NAME-bom.csv" "$D/$NAME-pos.csv"
